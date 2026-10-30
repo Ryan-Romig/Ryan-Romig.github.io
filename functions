@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+fix-mp4(){
+    FILE_PATH=$1
+
+    # Check if the binary path is present
+    if [ -z "$FILE_PATH" ]; then
+        read -p "Enter mp4 filepath " FILE_PATH
+    fi
+    
+    #check if the user input a variable and expand
+    FILE_PATH=$(eval echo $FILE_PATH)
+
+    
+    # Check if the binary exists
+    if [ ! -f "$FILE_PATH" ]; then
+        echo "Error: Binary file $FILE_PATH does not exist."
+        return 1
+    fi
+
+    # Create the desktop file
+    ffmpeg -i $FILE_PATH -movflags faststart -acodec copy -vcodec copy output_temp.mp4
+    mv $FILE_PATH original_$FILE_PATH
+    mv output_temp.mp4 $FILE_PATH
+    rm original_$FILE_PATH
+    # while IFS=, read -r filename status
+    # do
+    #     if [ "$status" == "done" ]; then
+    #         continue
+    #     fi
+    #     if grep -q "$filename" info.csv; then
+    #         continue
+    #     else
+    #         fix-mp4 "$filename"
+    #         echo "$filename,$(date +\%Y-\%m-\%d\ %H:\%M:\%S)" >> info.csv
+    #     fi
+    # done < info.csv
+    echo "File fixed and original file renamed to original_$FILE_PATH"
+}
+
+get-nvm() {
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+}
+
+get-sdkman(){
+    [[ -s "$SDKMAN_DIR/bin/sdkman-init.sh" ]] && source "$SDKMAN_DIR/bin/sdkman-init.sh"
+}
+boot-windows() {
+    #gets first argument
+    # if no argument is given, default to Windows
+    label="$1"
+    if [ -z "$label" ]; then
+        label="Windows"
+    fi
+    # Get the boot number corresponding to the label
+    #run efibootmgr and search for the text containing the label from above
+    # get the first column of the line containing the label and print it out
+    # remove the * from the boot number
+    # and remove the Boot prefix from the boot number
+    boot_number=$(efibootmgr | grep "$label" | awk '{print $1}' | cut -d'*' -f1 | sed -e 's/^Boot//')
+    # if the boot number is empty, print an error message
+    if [ -z "$boot_number" ]; then
+        echo "Boot entry not found for label: $label"
+    fi
+    # Set the next boot to the found boot number
+    sudo efibootmgr --bootnext "$boot_number"
+    echo "Next boot set to $label"
+    read -p "Reboot now? (y/n) " reboot
+    echo $reboot
+    if [[ $reboot =~ ^[Yy]$ ]]; then
+        sudo reboot -n
+    fi
+}
+
+create-desktop-shortcut() {
+    BINARY_PATH=$1
+    APP_NAME=$2
+    BINARY_NAME=$3
+    ICON_PATH=$4
+    # Check if the binary path is present
+    if [ -z "$BINARY_PATH" ]; then
+        read -p "Enter binary path: " BINARY_PATH
+    fi
+    # Check if the app name is present
+    if [ -z "$APP_NAME" ]; then
+        read -p "Enter app name: " APP_NAME
+    fi
+    # Check if the binary name is present
+    if [ -z "$BINARY_NAME" ]; then
+        read -p "Enter binary name: " BINARY_NAME
+    fi
+    # Check if the icon path is present
+    if [ -z "$ICON_PATH" ]; then
+        read -p "Enter icon path: " ICON_PATH
+    fi
+    
+    #check if the user input a variable and expand
+    BINARY_PATH=$(eval echo $BINARY_PATH)
+    ICON_PATH=$(eval echo $ICON_PATH)
+    
+    # Check if the binary exists
+    if [ ! -f "$BINARY_PATH" ]; then
+        echo "Error: Binary file $BINARY_PATH does not exist."
+        return 1
+    fi
+    # Check if the icon file exists
+    if [ ! -f "$ICON_PATH" ]; then
+        echo "Error: Icon file $ICON_PATH does not exist."
+        #don't return because the app can still work with no icon
+    fi
+    # Check if the desktop file already exists
+    if [ -f "$DESKTOP_FILE" ]; then
+        echo "Error: Desktop file $DESKTOP_FILE already exists."
+        return 1
+    fi
+    # Check if the binary is executable
+    if [ ! -x "$BINARY_PATH" ]; then
+        echo "Error: Binary file $BINARY_PATH is not executable."
+        return 1
+    fi
+    
+    # eval "BINARY_PATH=\"$BINARY_PATH\""
+    # eval "APP_NAME=\"$APP_NAME\""
+    # eval "BINARY_NAME=\"$BINARY_NAME\""
+    # eval "ICON_PATH=\"$ICON_PATH\""
+
+    # Define the application name and executable path
+    # Define the desktop file path
+    DESKTOP_FILE="$HOME/.local/share/applications/$BINARY_NAME.desktop"
+    sudo ln -rs "$BINARY_PATH" /home/$USER/.local/bin/$BINARY_NAME
+    # Create the desktop file
+    cat >"$DESKTOP_FILE" <<EOL
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=$APP_NAME
+Exec=$BINARY_NAME %f
+Icon=$ICON_PATH
+Terminal=false
+StartupNotify=true
+
+EOL
+    # Make the desktop file executable
+    chmod +x "$DESKTOP_FILE"
+    echo "Desktop file created at: $DESKTOP_FILE"
+}
+configure-git() {
+    # configure git because i can never remember the commands
+    read -p "enter email address " email
+    read -p "enter username " username
+    git config --global user.email $email
+    git config --global user.name $username
+}
+install-diptrace-net() {
+    sudo apt install wine-development
+    mkdir -p $APPLICATIONS_FOLDER/diptrace
+    wget https://diptrace.com/downloads/dipfree_en64.exe -O $APPLICATIONS_FOLDER/diptrace/dipfree.exe
+    wine $APPLICATIONS_FOLDER/diptrace/dipfree.exe
+}
